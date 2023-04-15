@@ -1,0 +1,60 @@
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier, VotingClassifier
+from sklearn.svm import SVC
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.metrics import accuracy_score, classification_report
+
+# Read data from CSV
+df = pd.read_csv('/kaggle/input/spaceship-titanic/train.csv')
+
+# Fill missing values
+num_cols = df.select_dtypes(include=['number']).columns
+cat_cols = df.select_dtypes(include=['object']).columns
+
+for col in num_cols:
+    df[col] = df[col].fillna(df[col].mean())
+
+for col in cat_cols:
+    df[col] = df[col].fillna(df[col].mode().iloc[0])
+
+
+X = df.drop('Transported', axis=1)
+y = df['Transported']
+
+X = pd.get_dummies(X, columns=['HomePlanet', 'CryoSleep', 'Cabin', 'Destination', 'VIP', 'Name'])
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+
+
+rf = RandomForestClassifier(n_estimators=200, random_state=42)
+svc = SVC(probability=True, random_state=42)
+dt = DecisionTreeClassifier(random_state=42)
+
+ensemble = VotingClassifier(estimators=[('rf', rf), ('svc', svc), ('dt', dt)], voting='soft')
+
+
+
+
+ensemble.fit(X_train, y_train)
+
+
+test_df = pd.read_csv('/kaggle/input/spaceship-titanic/test.csv')
+
+
+for col in num_cols:
+    test_df[col] = test_df[col].fillna(test_df[col].mean())
+
+for col in cat_cols:
+    test_df[col] = test_df[col].fillna(test_df[col].mode().iloc[0])
+
+
+test_X = pd.get_dummies(test_df, columns=['HomePlanet', 'CryoSleep', 'Cabin', 'Destination', 'VIP', 'Name'])
+
+
+test_X = test_X.reindex(columns=X.columns, fill_value=0)
+
+
+test_predictions = ensemble.predict(test_X)
+submission = pd.DataFrame({'PassengerId': test_df['PassengerId'], 'Transported': test_predictions})
+submission.to_csv('sample_submission.csv', index=False)
